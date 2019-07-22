@@ -415,6 +415,20 @@ async function getById(context, id, withPermissions = true, content = Content.AL
     });
 }
 
+async function getByCidTx(tx, context, cid) {
+    await shares.enforceEntityPermissionTx(tx, context, 'campaign', cid, 'view');
+
+    const entity = await tx('campaigns').where('cid', campaignCid).first();
+
+    return entity;
+}
+
+async function getByCid(cid) {
+    return await knex.transaction(async tx => {
+        return await rawGetByTx(tx,'cid',cid);
+    });
+}
+
 async function _validateAndPreprocess(tx, context, entity, isCreate, content) {
     if (content === Content.ALL || content === Content.WITHOUT_SOURCE_CUSTOM || content === Content.RSS_ENTRY) {
         await namespaceHelpers.validateEntity(tx, entity);
@@ -960,6 +974,8 @@ module.exports.listLinkClicksDTAjax = listLinkClicksDTAjax;
 
 module.exports.getByIdTx = getByIdTx;
 module.exports.getById = getById;
+module.exports.getByCidTx = getByCidTx;
+module.exports.getByCid = getByCid;
 module.exports.create = create;
 module.exports.createRssTx = createRssTx;
 module.exports.updateWithConsistencyCheck = updateWithConsistencyCheck;

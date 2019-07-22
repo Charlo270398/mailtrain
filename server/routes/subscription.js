@@ -14,6 +14,8 @@ const contextHelpers = require('../lib/context-helpers');
 const forms = require('../models/forms');
 const {getTrustedUrl, getPublicUrl} = require('../lib/urls');
 const bluebird = require('bluebird');
+const segment = require('../models/segments');
+const campaigns = require('../models/campaigns');
 
 const { SubscriptionStatus, SubscriptionSource } = require('../../shared/lists');
 
@@ -552,12 +554,16 @@ router.postAsync('/:lcid/unsubscribe', passport.parseForm, passport.csrfProtecti
 
 
 async function handleUnsubscribe(list, subscriptionCid, autoUnsubscribe, campaignCid, ip, req, res) {
+    
+
+    const campaignId = await campaigns.getByCid(campaignCid);
+
     if ((list.unsubscription_mode === lists.UnsubscriptionMode.ONE_STEP || list.unsubscription_mode === lists.UnsubscriptionMode.ONE_STEP_WITH_FORM) ||
         (autoUnsubscribe && (list.unsubscription_mode === lists.UnsubscriptionMode.TWO_STEP || list.unsubscription_mode === lists.UnsubscriptionMode.TWO_STEP_WITH_FORM)) ) {
-
+            
         try {
             const subscription = await subscriptions.unsubscribeByCidAndGet(contextHelpers.getAdminContext(), list.id, subscriptionCid, campaignCid);
-
+            
             await mailHelpers.sendUnsubscriptionConfirmed(req.locale, list, subscription.email, subscription);
 
             res.redirect('/subscription/' + encodeURIComponent(list.cid) + '/unsubscribed-notice');
@@ -570,7 +576,8 @@ async function handleUnsubscribe(list, subscriptionCid, autoUnsubscribe, campaig
 
     } else {
         const subscription = await subscriptions.getByCid(contextHelpers.getAdminContext(), list.id, subscriptionCid, false);
-
+        const s = await segment.getSegmentBySubCampaign(contextHelpers.getAdminContext(), campaignId.id, list.id, subscription.id);
+        
         if (subscription.status !== SubscriptionStatus.SUBSCRIBED) {
             throw new interoperableErrors.NotFoundError('Subscription not found in this list');
         }
@@ -584,13 +591,24 @@ async function handleUnsubscribe(list, subscriptionCid, autoUnsubscribe, campaig
 
             const confirmCid = await confirmations.addConfirmation(list.id, 'unsubscribe', ip, data);
             await mailHelpers.sendConfirmUnsubscription(req.locale, list, subscription.email, confirmCid, subscription);
-
-            res.redirect('/subscription/' + encodeURIComponent(list.cid) + '/confirm-unsubscription-notice');
+            
+            if(s){
+                res.redirect('/subscription/' + encodeURIComponent(list.cid)  + '/' + encodeURIComponent(s.custom_forms_id) + '/confirm-unsubscription-notice');
+            }
+            else{
+                res.redirect('/subscription/' + encodeURIComponent(list.cid) +  '/' + encodeURIComponent(null) + '/confirm-unsubscription-notice');
+            }
 
         } else { // UnsubscriptionMode.MANUAL
-            res.redirect('/subscription/' + encodeURIComponent(list.cid) + '/manual-unsubscribe-notice');
+            if(s){
+                res.redirect('/subscription/' + encodeURIComponent(list.cid) + '/' + encodeURIComponent(s.custom_forms_id) + '/manual-unsubscribe-notice');
+            }
+            else{
+                res.redirect('/subscription/' + encodeURIComponent(list.cid) + '/' + encodeURIComponent(null) + '/manual-unsubscribe-notice');
+            }
         }
     }
+    
 }
 
 
@@ -598,7 +616,7 @@ router.getAsync('/:cid/confirm-subscription-notice', async (req, res) => {
     await webNotice('confirm-subscription', req, res);
 });
 
-router.getAsync('/:cid/confirm-unsubscription-notice', async (req, res) => {
+router.getAsync('/:cid/:segid/confirm-unsubscription-notice', async (req, res) => {
     await webNotice('confirm-unsubscription', req, res);
 });
 
@@ -675,8 +693,13 @@ async function webNotice(type, req, res) {
         }
     };
 
-    await injectCustomFormData(req.query.fid || list.default_form, 'web_' + type.replace('-', '_') + '_notice', data);
-
+    if(req.params.segid == 'null'){
+        await injectCustomFormData(req.query.fid || list.default_form, 'web_' + type.replace('-', '_') + '_notice', data);
+    }
+    else{
+        await injectCustomFormData(req.query.fid || req.params.segid, 'web_' + type.replace('-', '_') + '_notice', data);     
+    }
+    
     const htmlRenderer = await tools.getTemplate(data.template, req.locale);
 
     data.isWeb = true;

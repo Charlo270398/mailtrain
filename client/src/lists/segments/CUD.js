@@ -4,11 +4,13 @@ import React, {Component} from "react";
 import PropTypes from "prop-types";
 import {withTranslation} from '../../lib/i18n';
 import {LinkButton, requiresAuthenticatedUser, Title, Toolbar, withPageHelpers} from "../../lib/page";
+import {Trans} from 'react-i18next';
 import {
     ButtonRow,
     Dropdown,
     filterData,
     Form,
+    TableSelect,
     FormSendMethod,
     InputField,
     withForm,
@@ -108,6 +110,7 @@ export default class CUD extends Component {
     getFormValuesMutator(data, originalData) {
         data.rootRuleType = data.settings.rootRule.type;
         data.selectedRule = (originalData && originalData.selectedRule) || null; // Validation errors of the selected rule are attached to this which makes sure we don't submit the segment if the opened rule has errors
+        data.form = data.custom_forms_id ? 'custom' : 'default';
 
         this.setState({
             rulesTree: this.getTreeFromRules(data.settings.rootRule.rules)
@@ -116,11 +119,14 @@ export default class CUD extends Component {
 
     submitFormValuesMutator(data) {
         data.settings.rootRule.type = data.rootRuleType;
+        if (data.form === 'default') {
+            data.custom_forms_id = null;
+        }
 
         // We have to clone the data here otherwise the form change detection doesn't work. This is because we use the state as a mutable structure.
         data = clone(data);
 
-        return filterData(data, ['name', 'settings']);
+        return filterData(data, ['name', 'settings', 'custom_forms_id']);
     }
 
     componentDidMount() {
@@ -130,6 +136,8 @@ export default class CUD extends Component {
         } else {
             this.populateFormValues({
                 name: '',
+                form: 'default',
+                custom_forms_id: 'default',
                 settings: {
                     rootRule: {
                         type: 'all',
@@ -153,6 +161,12 @@ export default class CUD extends Component {
 
         if (state.getIn(['selectedRule', 'value']) === null) {
             state.setIn(['selectedRule', 'error'], null);
+        }
+
+        if (state.getIn(['form', 'value']) === 'custom' && !state.getIn(['custom_forms_id', 'value'])) {
+            state.setIn(['custom_forms_id', 'error'], t('customFormMustBeSelected'));
+        } else {
+            state.setIn(['custom_forms_id', 'error'], null);
         }
     }
 
@@ -323,6 +337,24 @@ export default class CUD extends Component {
             }
         }
 
+        const customFormsColumns = [
+            {data: 0, title: "#"},
+            {data: 1, title: t('name')},
+            {data: 2, title: t('description')},
+            {data: 3, title: t('namespace')}
+        ];
+
+        const formsOptions = [
+            {
+                key: 'default',
+                label: t('listForms')
+            },
+            {
+                key: 'custom',
+                label: t('customFormsSelectFormBelow')
+            }
+        ];
+
         return (
 
             <div>
@@ -344,6 +376,10 @@ export default class CUD extends Component {
 
                     <InputField id="name" label={t('name')} />
                     <Dropdown id="rootRuleType" label={t('toplevelMatchType')} options={ruleHelpers.getCompositeRuleTypeOptions()} />
+                    <Dropdown id="form" label={t('forms')} options={formsOptions} help={t('webAndEmailFormsAndTemplatesUsedIn')}/>
+                    {this.getFormValue('form') === 'custom' &&
+                        <TableSelect id="custom_forms_id" label={t('customForms')} withHeader dropdown dataUrl='rest/forms-table' columns={customFormsColumns} selectionLabelIndex={1} help={<Trans i18nKey="theCustomFormUsedForThisSegmentYouCanCreate">The custom form used for this list. You can create a form <a href={`/lists/forms/create`}>here</a>.</Trans>}/>
+                    }
                 </Form>
 
                 <hr />

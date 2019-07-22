@@ -12,8 +12,9 @@ const subscriptions = require('./subscriptions');
 const dependencyHelpers = require('../lib/dependency-helpers');
 const {ListActivityType} = require('../../shared/activity-log');
 const activityLog = require('../lib/activity-log');
+const shortid = require('shortid');
 
-const allowedKeys = new Set(['name', 'settings']);
+const allowedKeys = new Set(['name', 'settings', 'custom_forms_id']);
 
 
 
@@ -303,6 +304,7 @@ async function create(context, listId, entity) {
         const filteredEntity = filterObject(entity, allowedKeys);
         filteredEntity.list = listId;
 
+        filteredEntity.cid = shortid.generate();
         const ids = await tx('segments').insert(filteredEntity);
         const id = ids[0];
 
@@ -429,6 +431,25 @@ async function getQueryGeneratorTx(tx, listId, id) {
     return query => processRule(query, settings.rootRule);
 } 
 
+//Returns a segment providing campaignID and listID
+async function getSegmentBySubCampaign(context, campaignID, listID, subscriptionID) {
+    return await knex.transaction(async tx => {
+        await shares.enforceEntityPermissionTx(tx, context, 'campaign', campaignID, 'view');
+        
+        const segmentsCount = await tx('campaign_lists').where({campaign: campaignID, list: listID}).count();///Listas en las que esté el subscription ID ???
+        if(segmentsCount == 0){//No segments in this list
+            return null;
+        }else{
+            if(segmentsCount==1){//Just one segment
+                const campaign_lists = await tx('campaign_lists').where({campaign: campaignID, list: listID}).first();
+                return await getById(context, listID, campaign_lists.segment);
+            }else{//More than one segment
+                return null;
+            }
+        }
+    });
+}
+
 // This is to handle circular dependency with fields.js
 module.exports.hash = hash;
 module.exports.listDTAjax = listDTAjax;
@@ -441,3 +462,4 @@ module.exports.remove = remove;
 module.exports.removeAllByListIdTx = removeAllByListIdTx;
 module.exports.removeRulesByColumnTx = removeRulesByColumnTx;
 module.exports.getQueryGeneratorTx = getQueryGeneratorTx;
+module.exports.getSegmentBySubCampaign = getSegmentBySubCampaign;
