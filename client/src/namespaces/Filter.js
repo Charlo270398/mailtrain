@@ -117,8 +117,9 @@ export default class Filter extends Component {
     async submitHandler(leave, disallow) {
 
         if(disallow){
-            document.cookie = 'namespaceFilterId' + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT;';//Delete namespaceFilter cookies
-            document.cookie = 'namespaceFilterName' + '=; expires=Thu, 01 Jan 1970 00:00:01 GMT;';  
+            //Delete namespaceFilter cookies
+            document.cookie = 'namespaceFilterId' + '=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            document.cookie = 'namespaceFilterName' + '=;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
             location.reload();
         }else{
             const t = this.props.t;
