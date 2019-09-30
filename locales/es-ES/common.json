@@ -704,7 +704,7 @@
   "passwordMustNotBeEmpty": "La contraseña no debe estar vacía",
   "verifyingCredentials": "Verificando credenciales ...",
   "pleaseEnterYourCredentialsAndTryAgain": "Ingrese sus credenciales e inténtelo de nuevo",
-  "invalidUsernameOrPassword": "Invalid username or password.",
+  "invalidUsernameOrPassword": "Usuario o contraseña inválidos",
   "forgotYourPassword?": "¿Olvidaste tu contraseña?",
   "signIn": "Iniciar sesión",
   "username": "Usuario",
